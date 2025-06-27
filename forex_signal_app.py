@@ -1,10 +1,11 @@
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period='3mo', interval='1h')
-    
+
     if df.empty:
         st.warning("⚠️ No data returned for symbol.")
         return pd.DataFrame()
@@ -28,7 +29,7 @@ def load_data(symbol):
     df['MACD'] = ema12 - ema26
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
 
-    # Drop rows with missing required indicators (only if those columns exist)
+    # Ensure required columns exist before dropping
     required_cols = ['EMA50', 'EMA200', 'RSI', 'MACD', 'Signal']
     existing_cols = [col for col in required_cols if col in df.columns]
     if existing_cols:
