@@ -4,18 +4,20 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# ✅ Robust signal generator
+# ✅ Signal generator function with proper checks
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
-    last = df.iloc[-1]
-    required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
+    last = df.iloc[-1]  # This returns a Series, so we can safely access last[col] as a scalar
 
+    required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
     for col in required_cols:
-        if col not in df.columns or pd.isna(last[col]):
-            return f"⚠️ Missing or NaN column: {col}", None, None
+        if col not in df.columns:
+            return f"⚠️ Column {col} missing", None, None
+        if pd.isna(last[col]):
+            return f"⚠️ Value for {col} is NaN", None, None
 
     if (
         last['RSI'] < 30 and
