@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+import numpy as np
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
@@ -18,11 +18,21 @@ symbol = pairs[pair_name]
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period="1mo", interval="1h")
-    df['EMA50'] = ta.ema(df['Close'], length=50)
-    df['EMA200'] = ta.ema(df['Close'], length=200)
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    macd = ta.macd(df['Close'])
-    return pd.concat([df, macd], axis=1)
+    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+
+    delta = df['Close'].diff()
+    gain = delta.where(delta > 0, 0).rolling(14).mean()
+    loss = -delta.where(delta < 0, 0).rolling(14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = exp1 - exp2
+    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    
+    return df
 
 data = load_data(symbol)
 
@@ -31,13 +41,13 @@ def signal_generator(df):
     if (
         last['RSI'] < 30 and
         last['EMA50'] > last['EMA200'] and
-        last['MACD_12_26_9'] > last['MACDs_12_26_9']
+        last['MACD'] > last['Signal']
     ):
         return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
     elif (
         last['RSI'] > 70 and
         last['EMA50'] < last['EMA200'] and
-        last['MACD_12_26_9'] < last['MACDs_12_26_9']
+        last['MACD'] < last['Signal']
     ):
         return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
     else:
