@@ -3,6 +3,8 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+
+# ✅ Keep this signal generator function
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
@@ -24,6 +26,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
+# Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -55,24 +58,6 @@ def load_data(symbol):
     return df
 
 data = load_data(symbol)
-
-def signal_generator(df):
-    last = df.iloc[-1]
-    if (
-        last['RSI'] < 30 and
-        last['EMA50'] > last['EMA200'] and
-        last['MACD'] > last['Signal']
-    ):
-        return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
-    elif (
-        last['RSI'] > 70 and
-        last['EMA50'] < last['EMA200'] and
-        last['MACD'] < last['Signal']
-    ):
-        return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
-    else:
-        return "❓ No Clear Signal", None, None
-
 signal, sl, tp = signal_generator(data)
 
 st.subheader(f"Signal for {pair_name}: {signal}")
@@ -89,4 +74,3 @@ fig.add_trace(go.Scatter(x=data.index, y=data['EMA50'], line=dict(color='blue', 
 fig.add_trace(go.Scatter(x=data.index, y=data['EMA200'], line=dict(color='orange', width=1), name="EMA200"))
 fig.update_layout(title=f"{pair_name} Price Chart", xaxis_title="Time", yaxis_title="Price", height=600)
 st.plotly_chart(fig, use_container_width=True)
-
