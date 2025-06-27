@@ -1,4 +1,3 @@
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -60,3 +59,4 @@ fig.add_trace(go.Scatter(x=data.index, y=data['EMA50'], line=dict(color='blue', 
 fig.add_trace(go.Scatter(x=data.index, y=data['EMA200'], line=dict(color='orange', width=1), name="EMA200"))
 fig.update_layout(title=f"{pair_name} Price Chart", xaxis_title="Time", yaxis_title="Price", height=600)
 st.plotly_chart(fig, use_container_width=True)
+
