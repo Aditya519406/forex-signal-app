@@ -1,32 +1,27 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 
-# Signal generator function
+# ------------------ Signal Generator ------------------
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
     last = df.iloc[-1]
-
-    # Check for missing or NaN values
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
-    for col in required_cols:
-        if col not in last.index or pd.isna(last[col]):
-            return "⚠️ Incomplete data for signal", None, None
+    if not all(col in last and pd.notna(last[col]) for col in required_cols):
+        return "⚠️ Incomplete data for signal", None, None
 
-    # Relaxed logic (adjust as needed)
     if (
-        last['RSI'] < 45 and
+        last['RSI'] < 30 and
         last['EMA50'] > last['EMA200'] and
         last['MACD'] > last['Signal']
     ):
         return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
     elif (
-        last['RSI'] > 55 and
+        last['RSI'] > 70 and
         last['EMA50'] < last['EMA200'] and
         last['MACD'] < last['Signal']
     ):
@@ -34,7 +29,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# Streamlit UI
+# ------------------ Streamlit UI ------------------
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -48,7 +43,7 @@ symbol = pairs[pair_name]
 
 @st.cache_data
 def load_data(symbol):
-    df = yf.download(symbol, period="5d", interval="15m")
+    df = yf.download(symbol, period="1mo", interval="1h")
     df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
     df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
 
@@ -62,14 +57,22 @@ def load_data(symbol):
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp1 - exp2
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    
+
     return df
 
+# ------------------ Load Data and Run ------------------
 data = load_data(symbol)
+signal, sl, tp = signal_generator(data)
 
-# Display latest indicator values
-if not data.dropna().empty:
-    last = data.dropna().iloc[-1]
+st.subheader(f"Signal for {pair_name}: {signal}")
+if sl and tp:
+    st.write(f"📍 **Stop Loss:** {sl}")
+    st.write(f"🎯 **Take Profit:** {tp}")
+
+# ------------------ Show Last Indicator Values ------------------
+clean_data = data.dropna()
+if not clean_data.empty:
+    last = clean_data.iloc[-1]
     st.write("### 🔍 Latest Indicator Values")
     st.write(f"RSI: {last['RSI']:.2f}")
     st.write(f"EMA50: {last['EMA50']:.5f}")
@@ -78,14 +81,7 @@ if not data.dropna().empty:
     st.write(f"Signal: {last['Signal']:.5f}")
     st.write(f"Close: {last['Close']:.5f}")
 
-signal, sl, tp = signal_generator(data)
-
-st.subheader(f"Signal for {pair_name}: {signal}")
-if sl and tp:
-    st.write(f"📍 **Stop Loss:** {sl}")
-    st.write(f"🎯 **Take Profit:** {tp}")
-
-# Plotting
+# ------------------ Plot ------------------
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
