@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# ✅ Signal generator function (fixed)
+# ✅ Signal generator with validation
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
@@ -12,10 +12,13 @@ def signal_generator(df):
 
     last = df.iloc[-1]
 
-    # Check if any required column is missing or NaN
-    for col in ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']:
-        if col not in last or pd.isna(last[col]):
-            return "⚠️ Incomplete data for signal", None, None
+    try:
+        for col in ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']:
+            value = last[col]
+            if pd.isna(value):
+                return "⚠️ Incomplete data for signal", None, None
+    except Exception as e:
+        return f"⚠️ Error reading data: {e}", None, None
 
     if (
         last['RSI'] < 30 and
@@ -34,7 +37,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# Streamlit UI setup
+# ✅ Streamlit UI setup
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -46,6 +49,7 @@ pairs = {
 pair_name = st.selectbox("Select Forex Pair", list(pairs.keys()))
 symbol = pairs[pair_name]
 
+# ✅ Data loading and indicators
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period="1mo", interval="1h")
@@ -62,12 +66,13 @@ def load_data(symbol):
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp1 - exp2
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    
+
     return df
 
 data = load_data(symbol)
 signal, sl, tp = signal_generator(data)
 
+# ✅ Display the signal and chart
 st.subheader(f"Signal for {pair_name}: {signal}")
 if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
