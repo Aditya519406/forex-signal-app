@@ -1,51 +1,44 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 
-# Signal Generator
+# Signal Generator Function
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
-    try:
-        last = df.iloc[-1]
-    except IndexError:
-        return "❓ No data available", None, None
+    last = df.iloc[-1]
 
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
     for col in required_cols:
         if col not in last:
             return f"⚠️ Missing column: {col}", None, None
         value = last[col]
-        if pd.isna(value) or isinstance(value, pd.Series):
+        if isinstance(value, pd.Series) or pd.isna(value):
             return f"⚠️ Invalid value in column: {col}", None, None
 
-    # Buy signal
     if (
         last['RSI'] < 30 and
         last['EMA50'] > last['EMA200'] and
         last['MACD'] > last['Signal']
     ):
         return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
-
-    # Sell signal
     elif (
         last['RSI'] > 70 and
         last['EMA50'] < last['EMA200'] and
         last['MACD'] < last['Signal']
     ):
         return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
-
     else:
         return "❓ No Clear Signal", None, None
 
-# Streamlit App Config
+# Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
-# Forex Pairs
 pairs = {
     "EUR/USD": "EURUSD=X",
     "USD/INR": "USDINR=X",
@@ -54,7 +47,6 @@ pairs = {
 pair_name = st.selectbox("Select Forex Pair", list(pairs.keys()))
 symbol = pairs[pair_name]
 
-# Load data and compute indicators
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period="1mo", interval="1h")
@@ -62,8 +54,9 @@ def load_data(symbol):
     df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
 
     delta = df['Close'].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+
     avg_gain = gain.rolling(window=14).mean()
     avg_loss = loss.rolling(window=14).mean()
     rs = avg_gain / avg_loss
@@ -73,26 +66,41 @@ def load_data(symbol):
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp1 - exp2
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-
+    
     return df
 
-# Get data and signal
+# Load Data
 data = load_data(symbol)
+
+# Generate Signal
 signal, sl, tp = signal_generator(data)
 
-# Display signal
 st.subheader(f"Signal for {pair_name}: {signal}")
 if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
     st.write(f"🎯 **Take Profit:** {tp}")
 
-# Display chart
+# Plot
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
-    x=data.index, open=data['Open'], high=data['High'],
-    low=data['Low'], close=data['Close'], name="Candlestick"
+    x=data.index,
+    open=data['Open'], high=data['High'],
+    low=data['Low'], close=data['Close'],
+    name="Candlestick"
 ))
-fig.add_trace(go.Scatter(x=data.index, y=data['EMA50'], line=dict(color='blue', width=1), name="EMA50"))
-fig.add_trace(go.Scatter(x=data.index, y=data['EMA200'], line=dict(color='orange', width=1), name="EMA200"))
-fig.update_layout(title=f"{pair_name} Price Chart", xaxis_title="Time", yaxis_title="Price", height=600)
+fig.add_trace(go.Scatter(
+    x=data.index, y=data['EMA50'],
+    line=dict(color='blue', width=1), name="EMA50"
+))
+fig.add_trace(go.Scatter(
+    x=data.index, y=data['EMA200'],
+    line=dict(color='orange', width=1), name="EMA200"
+))
+
+fig.update_layout(
+    title=f"{pair_name} Price Chart",
+    xaxis_title="Time",
+    yaxis_title="Price",
+    height=600
+)
 st.plotly_chart(fig, use_container_width=True)
