@@ -1,9 +1,10 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 
-# ------------------ Signal Generator ------------------
+# ✅ Signal generator with proper checks
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
@@ -11,7 +12,8 @@ def signal_generator(df):
 
     last = df.iloc[-1]
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
-    if not all(col in last and pd.notna(last[col]) for col in required_cols):
+
+    if not all([col in df.columns and pd.notna(last[col]) for col in required_cols]):
         return "⚠️ Incomplete data for signal", None, None
 
     if (
@@ -29,7 +31,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# ------------------ Streamlit UI ------------------
+# Streamlit UI setup
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -57,31 +59,20 @@ def load_data(symbol):
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp1 - exp2
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-
+    
     return df
 
-# ------------------ Load Data and Run ------------------
+# Load and analyze data
 data = load_data(symbol)
 signal, sl, tp = signal_generator(data)
 
+# Display results
 st.subheader(f"Signal for {pair_name}: {signal}")
 if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
     st.write(f"🎯 **Take Profit:** {tp}")
 
-# ------------------ Show Last Indicator Values ------------------
-clean_data = data.dropna()
-if not clean_data.empty:
-    last = clean_data.iloc[-1]
-    st.write("### 🔍 Latest Indicator Values")
-    st.write(f"RSI: {last['RSI']:.2f}")
-    st.write(f"EMA50: {last['EMA50']:.5f}")
-    st.write(f"EMA200: {last['EMA200']:.5f}")
-    st.write(f"MACD: {last['MACD']:.5f}")
-    st.write(f"Signal: {last['Signal']:.5f}")
-    st.write(f"Close: {last['Close']:.5f}")
-
-# ------------------ Plot ------------------
+# Chart
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
