@@ -13,11 +13,11 @@ def signal_generator(df):
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
 
     for col in required_cols:
-        if col not in last.index:
+        if col not in df.columns:
             return f"⚠️ Missing column: {col}", None, None
         value = last[col]
         try:
-            if pd.isna(value):
+            if pd.isna(value) or np.isnan(value):
                 return f"⚠️ Invalid or missing value in column: {col}", None, None
         except Exception:
             return f"⚠️ Error reading column: {col}", None, None
@@ -39,7 +39,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# ✅ Streamlit App UI
+# ✅ Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -54,14 +54,20 @@ symbol = pairs[pair_name]
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period="1mo", interval="1h")
+    
+    # Indicators
     df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
     df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
 
     delta = df['Close'].diff()
-    gain = delta.where(delta > 0, 0).rolling(14).mean()
-    loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    rs = gain / loss
+    gain = np.where(delta > 0, delta, 0)
+    loss = np.where(delta < 0, -delta, 0)
+
+    avg_gain = pd.Series(gain).rolling(window=14).mean()
+    avg_loss = pd.Series(loss).rolling(window=14).mean()
+    rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
+    df['RSI'] = df['RSI'].fillna(method='bfill')
 
     exp1 = df['Close'].ewm(span=12, adjust=False).mean()
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
@@ -70,17 +76,17 @@ def load_data(symbol):
 
     return df
 
-# ✅ Load and Analyze Data
+# ✅ Load and Process Data
 data = load_data(symbol)
 signal, sl, tp = signal_generator(data)
 
-# ✅ Display Results
+# ✅ Show Signal
 st.subheader(f"Signal for {pair_name}: {signal}")
 if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
     st.write(f"🎯 **Take Profit:** {tp}")
 
-# ✅ Plot Chart
+# ✅ Chart
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
