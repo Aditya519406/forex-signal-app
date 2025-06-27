@@ -1,22 +1,22 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 
-# ✅ Signal generator
+# -------------------------------
+# 🔧 Signal Generator Function
+# -------------------------------
 def signal_generator(df):
-    df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
     last = df.iloc[-1]
-
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
+
     for col in required_cols:
-        if col not in df.columns:
-            return f"⚠️ Missing column: {col}", None, None
         value = last[col]
-        if isinstance(value, (pd.Series, pd.DataFrame)) or pd.isnull(value):
+        if pd.isna(value):
             return f"⚠️ Invalid or missing value in column: {col}", None, None
 
     if (
@@ -34,21 +34,16 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# ✅ Streamlit UI
-st.set_page_config(page_title="Forex Signal Tool", layout="wide")
-st.title("📈 Forex Signal Tool")
-
-pairs = {
-    "EUR/USD": "EURUSD=X",
-    "USD/INR": "USDINR=X",
-    "USD/JPY": "USDJPY=X"
-}
-pair_name = st.selectbox("Select Forex Pair", list(pairs.keys()))
-symbol = pairs[pair_name]
-
+# -------------------------------
+# 📊 Load Data
+# -------------------------------
 @st.cache_data
 def load_data(symbol):
     df = yf.download(symbol, period="1mo", interval="1h")
+    
+    if df.empty or len(df) < 50:
+        return pd.DataFrame()
+
     df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
     df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
 
@@ -62,18 +57,40 @@ def load_data(symbol):
     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp1 - exp2
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    
-    return df
+
+    return df.dropna()
+
+# -------------------------------
+# 🌐 Streamlit UI
+# -------------------------------
+st.set_page_config(page_title="Forex Signal Tool", layout="wide")
+st.title("📈 Forex Signal Tool")
+
+pairs = {
+    "EUR/USD": "EURUSD=X",
+    "USD/INR": "USDINR=X",
+    "USD/JPY": "USDJPY=X"
+}
+pair_name = st.selectbox("Select Forex Pair", list(pairs.keys()))
+symbol = pairs[pair_name]
 
 data = load_data(symbol)
-signal, sl, tp = signal_generator(data)
 
-st.subheader(f"Signal for {pair_name}: {signal}")
-if sl and tp:
-    st.write(f"📍 **Stop Loss:** {sl}")
-    st.write(f"🎯 **Take Profit:** {tp}")
+# -------------------------------
+# 🧠 Generate Signal
+# -------------------------------
+if data.empty:
+    st.subheader(f"⚠️ Not enough data to generate signal for {pair_name}")
+else:
+    signal, sl, tp = signal_generator(data)
+    st.subheader(f"Signal for {pair_name}: {signal}")
+    if sl and tp:
+        st.write(f"📍 **Stop Loss:** {sl}")
+        st.write(f"🎯 **Take Profit:** {tp}")
 
-# ✅ Price Chart
+# -------------------------------
+# 📈 Price Chart
+# -------------------------------
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
@@ -81,5 +98,6 @@ fig.add_trace(go.Candlestick(
 ))
 fig.add_trace(go.Scatter(x=data.index, y=data['EMA50'], line=dict(color='blue', width=1), name="EMA50"))
 fig.add_trace(go.Scatter(x=data.index, y=data['EMA200'], line=dict(color='orange', width=1), name="EMA200"))
+
 fig.update_layout(title=f"{pair_name} Price Chart", xaxis_title="Time", yaxis_title="Price", height=600)
 st.plotly_chart(fig, use_container_width=True)
