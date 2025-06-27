@@ -3,7 +3,9 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-)def signal_generator(df):
+
+# ✅ Signal generator function (fixed)
+def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
@@ -21,14 +23,6 @@ import plotly.graph_objects as go
         last['MACD'] > last['Signal']
     ):
         return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
-    elif (
-        last['RSI'] > 70 and
-        last['EMA50'] < last['EMA200'] and
-        last['MACD'] < last['Signal']
-    ):
-        return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
-    else:
-        return "❓ No Clear Signal", None, None
 
     elif (
         last['RSI'] > 70 and
@@ -36,10 +30,11 @@ import plotly.graph_objects as go
         last['MACD'] < last['Signal']
     ):
         return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
+
     else:
         return "❓ No Clear Signal", None, None
 
-# Streamlit UI
+# Streamlit UI setup
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
