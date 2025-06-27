@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# ✅ Signal generator with proper checks
+# ✅ Robust signal generator
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
@@ -13,8 +13,9 @@ def signal_generator(df):
     last = df.iloc[-1]
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
 
-    if not all([col in df.columns and pd.notna(last[col]) for col in required_cols]):
-        return "⚠️ Incomplete data for signal", None, None
+    for col in required_cols:
+        if col not in df.columns or pd.isna(last[col]):
+            return f"⚠️ Missing or NaN column: {col}", None, None
 
     if (
         last['RSI'] < 30 and
@@ -31,7 +32,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# Streamlit UI setup
+# 🌐 Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -62,17 +63,15 @@ def load_data(symbol):
     
     return df
 
-# Load and analyze data
 data = load_data(symbol)
 signal, sl, tp = signal_generator(data)
 
-# Display results
 st.subheader(f"Signal for {pair_name}: {signal}")
 if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
     st.write(f"🎯 **Take Profit:** {tp}")
 
-# Chart
+# 📊 Chart
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
