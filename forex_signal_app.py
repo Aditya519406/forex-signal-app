@@ -3,20 +3,33 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-
-# ✅ Keep this signal generator function
-def signal_generator(df):
+)def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
     last = df.iloc[-1]
+
+    # Check if any required column is missing or NaN
+    for col in ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']:
+        if col not in last or pd.isna(last[col]):
+            return "⚠️ Incomplete data for signal", None, None
+
     if (
         last['RSI'] < 30 and
         last['EMA50'] > last['EMA200'] and
         last['MACD'] > last['Signal']
     ):
         return "📈 Call (Buy)", round(last['Close'] - 0.002, 5), round(last['Close'] + 0.004, 5)
+    elif (
+        last['RSI'] > 70 and
+        last['EMA50'] < last['EMA200'] and
+        last['MACD'] < last['Signal']
+    ):
+        return "📉 Put (Sell)", round(last['Close'] + 0.002, 5), round(last['Close'] - 0.004, 5)
+    else:
+        return "❓ No Clear Signal", None, None
+
     elif (
         last['RSI'] > 70 and
         last['EMA50'] < last['EMA200'] and
