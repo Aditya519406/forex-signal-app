@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 
 # ✅ Signal generator
@@ -10,19 +9,15 @@ def signal_generator(df):
     if df.empty:
         return "❓ Not enough data", None, None
 
-    try:
-        last = df.iloc[-1].squeeze()  # Enforce row -> Series
-    except Exception:
-        return "⚠️ Could not get last row", None, None
+    last = df.iloc[-1]
 
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
     for col in required_cols:
-        try:
-            value = last[col]
-        except Exception:
-            return f"⚠️ Column {col} missing", None, None
-        if pd.isna(value):
-            return f"⚠️ {col} is NaN", None, None
+        if col not in df.columns:
+            return f"⚠️ Missing column: {col}", None, None
+        value = last[col]
+        if isinstance(value, (pd.Series, pd.DataFrame)) or pd.isnull(value):
+            return f"⚠️ Invalid or missing value in column: {col}", None, None
 
     if (
         last['RSI'] < 30 and
@@ -39,7 +34,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# 📈 Streamlit UI
+# ✅ Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
@@ -78,7 +73,7 @@ if sl and tp:
     st.write(f"📍 **Stop Loss:** {sl}")
     st.write(f"🎯 **Take Profit:** {tp}")
 
-# 📊 Chart
+# ✅ Price Chart
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data.index, open=data['Open'], high=data['High'],
