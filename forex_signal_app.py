@@ -4,20 +4,25 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-# ✅ Signal generator function with proper checks
+# ✅ Signal generator
 def signal_generator(df):
     df = df.dropna()
     if df.empty:
         return "❓ Not enough data", None, None
 
-    last = df.iloc[-1]  # This returns a Series, so we can safely access last[col] as a scalar
+    try:
+        last = df.iloc[-1].squeeze()  # Enforce row -> Series
+    except Exception:
+        return "⚠️ Could not get last row", None, None
 
     required_cols = ['RSI', 'EMA50', 'EMA200', 'MACD', 'Signal', 'Close']
     for col in required_cols:
-        if col not in df.columns:
+        try:
+            value = last[col]
+        except Exception:
             return f"⚠️ Column {col} missing", None, None
-        if pd.isna(last[col]):
-            return f"⚠️ Value for {col} is NaN", None, None
+        if pd.isna(value):
+            return f"⚠️ {col} is NaN", None, None
 
     if (
         last['RSI'] < 30 and
@@ -34,7 +39,7 @@ def signal_generator(df):
     else:
         return "❓ No Clear Signal", None, None
 
-# 🌐 Streamlit UI
+# 📈 Streamlit UI
 st.set_page_config(page_title="Forex Signal Tool", layout="wide")
 st.title("📈 Forex Signal Tool")
 
