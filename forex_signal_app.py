@@ -1,44 +1,44 @@
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 import numpy as np
-import yfinance as yf
 
-# Title
-st.title("📊 Forex Signal Generator")
+st.set_page_config(page_title="Forex Signal App", layout="centered")
 
-# Sidebar - Select symbol
-symbol = st.sidebar.selectbox("Choose a Forex pair", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"])
+st.title("💹 Forex Signal App")
+symbol = st.text_input("Enter Forex pair symbol (e.g., EURUSD=X):", "EURUSD=X")
 
-# Load and process data
 @st.cache_data
 def load_data(symbol):
-    df = yf.download(symbol, period="60d", interval="1h")
-    
-    if df.empty:
-        return pd.DataFrame()  # Return empty df if no data
-    
-    df['EMA50'] = df['Close'].ewm(span=50).mean()
-    df['EMA200'] = df['Close'].ewm(span=200).mean()
-    
-    delta = df['Close'].diff()
-    gain = np.where(delta > 0, delta, 0)
-    loss = np.where(delta < 0, -delta, 0)
+    try:
+        df = yf.download(symbol, period="60d", interval="1h")
+        if df.empty:
+            return pd.DataFrame()
 
-    avg_gain = pd.Series(gain).rolling(window=14).mean()
-    avg_loss = pd.Series(loss).rolling(window=14).mean()
-    rs = avg_gain / avg_loss
-    df['RSI'] = 100 - (100 / (1 + rs))
+        df['EMA50'] = df['Close'].ewm(span=50).mean()
+        df['EMA200'] = df['Close'].ewm(span=200).mean()
 
-    # MACD
-    ema12 = df['Close'].ewm(span=12).mean()
-    ema26 = df['Close'].ewm(span=26).mean()
-    df['MACD'] = ema12 - ema26
-    df['Signal'] = df['MACD'].ewm(span=9).mean()
+        delta = df['Close'].diff()
+        gain = np.where(delta > 0, delta, 0)
+        loss = np.where(delta < 0, -delta, 0)
 
-    df.dropna(inplace=True)
-    return df
+        avg_gain = pd.Series(gain).rolling(window=14).mean()
+        avg_loss = pd.Series(loss).rolling(window=14).mean()
+        rs = avg_gain / avg_loss
+        df['RSI'] = 100 - (100 / (1 + rs))
 
-# Signal generator
+        ema12 = df['Close'].ewm(span=12).mean()
+        ema26 = df['Close'].ewm(span=26).mean()
+        df['MACD'] = ema12 - ema26
+        df['Signal'] = df['MACD'].ewm(span=9).mean()
+
+        df.dropna(inplace=True)
+        return df
+
+    except Exception as e:
+        st.error(f"⚠️ Error fetching data: {e}")
+        return pd.DataFrame()
+
 def signal_generator(df):
     if df.empty or len(df) < 1:
         return "⚠️ Not enough data", None, None
@@ -50,7 +50,6 @@ def signal_generator(df):
 
     try:
         last = df.iloc[-1]
-
         if (
             last['EMA50'] > last['EMA200'] and
             last['RSI'] < 70 and
@@ -71,20 +70,16 @@ def signal_generator(df):
     except Exception as e:
         return f"⚠️ Error: {str(e)}", None, None
 
-# Load data
-data = load_data(symbol)
+# Load data and generate signal
+if symbol:
+    with st.spinner("Loading data..."):
+        data = load_data(symbol)
+        signal, sl, tp = signal_generator(data)
 
-# Generate signal
-signal, sl, tp = signal_generator(data)
+    st.subheader(f"Signal for {symbol}")
+    st.write(signal)
 
-# Display results
-st.subheader(f"Signal for {symbol.replace('=X', '')}:")
-st.write(signal)
-if sl:
-    st.write(f"Stop Loss: {sl}")
-if tp:
-    st.write(f"Take Profit: {tp}")
-
-# Plot
-if not data.empty:
-    st.line_chart(data[['Close', 'EMA50', 'EMA200']])
+    if sl and tp:
+        st.write(f"**Stop Loss:** {sl}")
+        st.write(f"**Take Profit:** {tp}")
+    st.line_chart(data['Close'] if not data.empty else pd.Series())
